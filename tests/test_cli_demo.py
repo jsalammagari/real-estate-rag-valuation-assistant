@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 
 def _run_cli(args: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     cmd = [sys.executable, "-m", "real_estate_rag.cli.main", *args]
@@ -12,6 +14,9 @@ def _run_cli(args: list[str], env: dict[str, str] | None = None) -> subprocess.C
     if env:
         merged_env.update(env)
     return subprocess.run(cmd, capture_output=True, text=True, env=merged_env, check=False)
+
+
+pytestmark = pytest.mark.integration
 
 
 def test_cli_help_lists_demo_subcommands() -> None:
@@ -75,6 +80,48 @@ def test_end_to_end_stub_demo_flow(tmp_path: Path) -> None:
     assert "doc_id=" in ask_result.stdout
 
 
+@pytest.mark.e2e
+def test_e2e_smoke_stub_demo_flow_runtime_bound(tmp_path: Path) -> None:
+    sample_dir = tmp_path / "sample_data"
+    vector_dir = tmp_path / "vector_db"
+    steps = [
+        ["create-sample-data", "--output-dir", str(sample_dir)],
+        [
+            "index",
+            "--input-dir",
+            str(sample_dir),
+            "--vector-db-path",
+            str(vector_dir),
+            "--collection",
+            "test_smoke",
+            "--embedding-provider",
+            "local",
+            "--embedding-dimensions",
+            "12",
+        ],
+        [
+            "ask",
+            "--question",
+            "What occupancy evidence exists?",
+            "--vector-db-path",
+            str(vector_dir),
+            "--collection",
+            "test_smoke",
+            "--embedding-provider",
+            "local",
+            "--embedding-dimensions",
+            "12",
+            "--llm-provider",
+            "stub",
+            "--top-k",
+            "3",
+        ],
+    ]
+    for step in steps:
+        result = _run_cli(step)
+        assert result.returncode == 0
+
+
 def test_ask_returns_non_zero_for_missing_vector_path(tmp_path: Path) -> None:
     missing_path = tmp_path / "missing_db"
     result = _run_cli(
@@ -96,3 +143,25 @@ def test_ask_returns_non_zero_for_missing_vector_path(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "ERROR:" in result.stdout
+
+
+def test_index_returns_non_zero_for_empty_input_dir(tmp_path: Path) -> None:
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir(parents=True)
+    result = _run_cli(
+        [
+            "index",
+            "--input-dir",
+            str(empty_dir),
+            "--vector-db-path",
+            str(tmp_path / "vector"),
+            "--collection",
+            "empty_case",
+            "--embedding-provider",
+            "local",
+            "--embedding-dimensions",
+            "12",
+        ]
+    )
+    assert result.returncode != 0
+    assert "No PDF files found" in result.stdout

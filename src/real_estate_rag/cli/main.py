@@ -245,8 +245,6 @@ def app() -> int:
 
 
 def _create_sample_data(output_dir: str) -> None:
-    from reportlab.pdfgen import canvas
-
     root = Path(output_dir).expanduser().resolve()
     comps_dir = root / "comps"
     memo_dir = root / "offering_memo"

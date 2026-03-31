@@ -1,6 +1,6 @@
 # Architecture (Stories 1-2)
 
-This document records baseline design and implemented contracts through Story 7.
+This document records baseline design and implemented contracts through Story 8.
 Downstream stories (presentation hardening and production concerns) extend this
 architecture.
 
@@ -243,6 +243,34 @@ Story 7 adds a stable operator-facing CLI for interview demos.
   `LLM_PROVIDER=stub`) with no paid APIs.
 - `ask` returns non-zero on missing vector path, empty index, or bad config.
 - Citation lines include `chunk_id`, `doc_id`, and `page_span` for auditability.
+
+## Story 8 Test and Automation Contract
+
+Story 8 standardizes confidence checks for local development and CI.
+
+### Test markers
+
+- `unit`: deterministic fast tests
+- `integration`: local component integration tests
+- `e2e`: end-to-end smoke tests over CLI flow
+- `network`: external-network tests (opt-in only)
+
+### Default execution policy
+
+- Local default: `make test` (`not e2e and not network`)
+- E2E smoke: `make test-e2e`
+- Aggregate check: `make ci`
+
+### CI policy
+
+- Workflow file: `.github/workflows/ci.yml`
+- Runs on push and pull_request
+- Executes: install -> lint -> default tests -> e2e smoke
+
+### Fixture strategy
+
+Synthetic fixture builders are centralized in `tests/fixtures.py` to reduce
+duplication and keep data non-confidential.
 
 ## Non-Confidentiality Rule
 

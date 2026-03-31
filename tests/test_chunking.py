@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from real_estate_rag.chunking import ChunkingConfig, chunk_segments
 from real_estate_rag.cleaning import CleanSegment
+
+pytestmark = pytest.mark.unit
 
 
 def _segment(text: str) -> CleanSegment:

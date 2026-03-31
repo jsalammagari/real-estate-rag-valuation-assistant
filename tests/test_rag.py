@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import pytest
 
 from real_estate_rag.embedding import EmbeddingClient
 from real_estate_rag.rag import LlmClient, RagConfig, RagEngine
 from real_estate_rag.vector_store import SearchResult, VectorStore
+
+pytestmark = pytest.mark.unit
 
 
 @dataclass
@@ -38,6 +41,9 @@ class FakeVectorStore(VectorStore):
     def query(self, vector, top_k, metadata_filter=None) -> tuple[SearchResult, ...]:
         self.last_filter = metadata_filter
         return self.hits[:top_k]
+
+    def count(self) -> int:  # pragma: no cover - not used in this test
+        return len(self.hits)
 
 
 def test_rag_answer_includes_citations_and_grounded_prompt() -> None:

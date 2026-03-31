@@ -9,6 +9,8 @@ from real_estate_rag.cleaning import CleanSegment
 from real_estate_rag.embedding import LocalHashEmbeddingClient
 from real_estate_rag.vector_store import ChromaVectorStore
 
+pytestmark = pytest.mark.integration
+
 
 def _segments() -> tuple[CleanSegment, ...]:
     return (

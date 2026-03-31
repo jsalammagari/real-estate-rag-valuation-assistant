@@ -2,22 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from reportlab.pdfgen import canvas
+import pytest
 
 from real_estate_rag.ingestion import (
     discover_pdf_files,
     extract_pdf_document,
     ingest_pdf_directory,
 )
+from tests.fixtures import write_pdf
 
 
-def _write_pdf(path: Path, page_texts: list[str]) -> None:
-    c = canvas.Canvas(str(path))
-    for text in page_texts:
-        if text:
-            c.drawString(72, 720, text)
-        c.showPage()
-    c.save()
+pytestmark = pytest.mark.unit
 
 
 def test_discovery_and_silo_inference(tmp_path: Path) -> None:
@@ -28,8 +23,8 @@ def test_discovery_and_silo_inference(tmp_path: Path) -> None:
 
     pdf_a = comps_dir / "comp_1.pdf"
     pdf_b = memo_dir / "memo_1.pdf"
-    _write_pdf(pdf_a, ["Comp A page 1", "Comp A page 2"])
-    _write_pdf(pdf_b, ["Memo A page 1"])
+    write_pdf(pdf_a, ["Comp A page 1", "Comp A page 2"])
+    write_pdf(pdf_b, ["Memo A page 1"])
 
     discovered = discover_pdf_files(tmp_path)
     assert discovered == [pdf_a, pdf_b]
@@ -45,7 +40,7 @@ def test_page_count_and_no_cross_page_merge(tmp_path: Path) -> None:
     source_dir = tmp_path / "comps"
     source_dir.mkdir(parents=True)
     pdf_path = source_dir / "property.pdf"
-    _write_pdf(pdf_path, ["First page text", "Second page text"])
+    write_pdf(pdf_path, ["First page text", "Second page text"])
 
     document = extract_pdf_document(pdf_path, root_dir=tmp_path)
     assert document.total_pages == 2
@@ -58,7 +53,7 @@ def test_doc_id_is_stable_for_same_file(tmp_path: Path) -> None:
     source_dir = tmp_path / "leases"
     source_dir.mkdir(parents=True)
     pdf_path = source_dir / "lease.pdf"
-    _write_pdf(pdf_path, ["Lease page 1"])
+    write_pdf(pdf_path, ["Lease page 1"])
 
     first = extract_pdf_document(pdf_path, root_dir=tmp_path)
     second = extract_pdf_document(pdf_path, root_dir=tmp_path)
@@ -69,7 +64,7 @@ def test_low_text_pages_are_flagged_as_scan_suspected(tmp_path: Path) -> None:
     source_dir = tmp_path / "comps"
     source_dir.mkdir(parents=True)
     pdf_path = source_dir / "low_text.pdf"
-    _write_pdf(pdf_path, ["x", ""])
+    write_pdf(pdf_path, ["x", ""])
 
     document = extract_pdf_document(pdf_path, root_dir=tmp_path, low_text_threshold=5)
     assert document.total_pages == 2

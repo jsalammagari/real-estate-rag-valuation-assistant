@@ -4,6 +4,8 @@ import pytest
 
 from real_estate_rag.embedding import LocalHashEmbeddingClient, create_embedding_client_from_env
 
+pytestmark = pytest.mark.unit
+
 
 def test_local_hash_embedding_shape_and_determinism() -> None:
     client = LocalHashEmbeddingClient(dimensions=8)

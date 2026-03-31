@@ -12,7 +12,7 @@ authors = [{ name = "Project Team" }]
 dependencies = ["pypdf>=5.0.0", "chromadb>=1.0.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0.0", "reportlab>=4.0.0"]
+dev = ["pytest>=8.0.0", "reportlab>=4.0.0", "ruff>=0.8.0"]
 
 [project.scripts]
 re-rag = "real_estate_rag.cli.main:app"
@@ -22,3 +22,11 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: fast deterministic unit tests",
+    "integration: integration tests over real local components",
+    "e2e: end-to-end smoke tests over CLI pipeline",
+    "network: tests that require external network access (opt-in)",
+]

@@ -9,6 +9,7 @@ real estate valuation RAG assistant. The current implementation includes:
 - Story 5 persistent vector indexing and metadata-filtered retrieval
 - Story 6 RAG orchestration with grounding, citations, and safe no-evidence behavior
 - Story 7 demo-ready CLI surface and runbook
+- Story 8 test hardening, automation commands, and CI smoke checks
 
 ## Implemented Scope
 
@@ -59,6 +60,13 @@ real estate valuation RAG assistant. The current implementation includes:
 - `ingest` inspection command for quick data sanity checks
 - non-zero CLI exits for missing index path / empty corpus / config issues
 - demo runbook in `docs/DEMO.md` with screen-share-safe guidance
+
+### Story 8 (test hardening and automation)
+- standardized pytest markers: `unit`, `integration`, `e2e`, `network`
+- centralized synthetic fixture helpers in `tests/fixtures.py`
+- dedicated e2e smoke coverage for CLI demo path
+- task runner targets via `Makefile`: `lint`, `test`, `test-e2e`, `ci`
+- CI workflow at `.github/workflows/ci.yml` aligned with local commands
 
 ## Technical Decisions (Phase 0)
 
@@ -301,15 +309,26 @@ NOI noted on 2025-03-07 at $1,250,000 for 12500 sqft
 ## Basic Checks
 
 ```bash
-pytest
+make lint
+make test
+make test-e2e
+make ci
 ```
+
+## Test and CI Notes
+
+- Default suite (`make test`) is offline and excludes `e2e` and `network` markers.
+- E2E smoke (`make test-e2e`) validates `create-sample-data -> index -> ask` path.
+- Network-marked tests are opt-in and skipped by default in CI.
+- CI workflow runs lint + default suite + e2e smoke on push/PR.
 
 ## Design and Architecture Docs
 
 - `DESIGN.md` - design decisions and architecture baseline updated through Story 7
-- `docs/ARCHITECTURE.md` - architecture contracts through Story 6
+- `docs/ARCHITECTURE.md` - architecture contracts through Story 8
 - `docs/DEMO.md` - demo script and runbook for Story 7
+- `CONTRIBUTING.md` - contributor commands, marker policy, and failure guidance
 
 ## Next Stories
 
-- Story 6+: RAG orchestration, answer grounding/citations, demo surface, and presentation readiness
+- Story 9+: documentation deepening, presentation package, and readiness rehearsals

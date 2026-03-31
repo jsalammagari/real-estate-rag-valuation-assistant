@@ -1,7 +1,7 @@
-# Design Decisions and Project Architecture (Stories 1-7)
+# Design Decisions and Project Architecture (Stories 1-8)
 
 This document captures baseline design decisions and the implemented contracts
-through Story 7.
+through Story 8.
 
 ## Story 1 Objectives
 
@@ -52,6 +52,13 @@ through Story 7.
 - Ensure deterministic stub-mode rehearsal without paid APIs.
 - Provide concise demo runbook with screen-share-safe instructions.
 - Return explicit non-zero CLI exits for common operator errors.
+
+## Story 8 Objectives
+
+- Standardize test execution paths for local and CI usage.
+- Add regression guards for common failure modes in demo workflows.
+- Ensure default test suite remains offline and deterministic.
+- Add CI automation that mirrors local lint/test commands.
 
 ## Design Decisions
 
@@ -184,6 +191,18 @@ through Story 7.
 - **Decision:** Keep a terminal-first CLI as the primary demo surface.
 - **Why:** Lower operational complexity and stronger live keyboard-skill signal
   for interview scenarios.
+
+### 22) Test execution policy
+
+- **Decision:** Separate quick default checks from e2e smoke via markers and
+  Makefile targets.
+- **Why:** Keeps fast feedback loops while preserving end-to-end confidence.
+
+### 23) CI parity policy
+
+- **Decision:** GitHub Actions runs the same `make lint`, `make test`, and
+  `make test-e2e` commands used locally.
+- **Why:** Reduces "works locally but fails in CI" drift.
 
 ## Planned Technical Stack (for Story 2+)
 
@@ -326,3 +345,16 @@ Implemented in Story 7:
 
 Out of scope in Story 7:
 - web UI polishing, authentication, analytics, and deployment manifests
+
+## Story 8 Implementation Status
+
+Implemented in Story 8:
+- `Makefile` targets: `lint`, `test`, `test-e2e`, `ci`
+- pytest marker definitions in `pyproject.toml`
+- CI workflow `.github/workflows/ci.yml`
+- contributor guide `CONTRIBUTING.md`
+- centralized test fixture helpers in `tests/fixtures.py`
+- e2e smoke marker coverage and additional regression test for empty input index
+
+Out of scope in Story 8:
+- load/perf testing, security testing, and model-quality benchmark suites

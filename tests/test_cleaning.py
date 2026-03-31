@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from real_estate_rag.cleaning import CleaningConfig, clean_ingested_document
 from real_estate_rag.ingestion import IngestedDocument, PageExtraction
+
+pytestmark = pytest.mark.unit
 
 
 def _doc(pages: tuple[PageExtraction, ...]) -> IngestedDocument:
