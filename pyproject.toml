@@ -9,7 +9,7 @@ description = "Prototype scaffold for a real estate valuation RAG assistant."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Project Team" }]
-dependencies = ["pypdf>=5.0.0"]
+dependencies = ["pypdf>=5.0.0", "chromadb>=1.0.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0.0", "reportlab>=4.0.0"]

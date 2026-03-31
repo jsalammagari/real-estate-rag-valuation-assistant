@@ -1,7 +1,7 @@
 # Architecture (Stories 1-2)
 
-This document records baseline design and implemented contracts through Story 4.
-Downstream stories (vector retrieval/generation) extend this architecture.
+This document records baseline design and implemented contracts through Story 5.
+Downstream stories (generation) extend this architecture.
 
 ## Planned Pipeline
 
@@ -138,6 +138,48 @@ mitigates boundary loss.
 ### Isolation boundary
 
 Story 4 does not import or depend on vector DB, retrieval ranking, or LLM code.
+
+## Story 5 Vector Index and Retrieval Contract
+
+Story 5 introduces persistent vector indexing and similarity retrieval using a
+local Chroma backend through a `VectorStore` abstraction.
+
+### Vector store interface
+
+- `upsert(chunks, embeddings)`: batch write/update vectors keyed by `chunk_id`
+- `clear()`: reset collection for test isolation
+- `query(vector, top_k, metadata_filter=None)`: nearest-neighbor retrieval with
+  optional metadata filtering
+
+### Backend choice
+
+- Implemented backend: `ChromaVectorStore`
+- Persistence: on-disk path (`VECTOR_DB_PATH`) reused across process restarts
+- Collection configuration: `VECTOR_DB_COLLECTION`
+
+### Idempotent indexing behavior
+
+Upsert uses deterministic `chunk_id`; re-indexing the same chunks updates
+existing points instead of creating unbounded duplicates.
+
+### Metadata filters
+
+Each vector point stores filterable metadata such as:
+- `doc_id`
+- `silo`
+- `page_start`, `page_end`
+- `content_type`
+- derived normalized hints (`norm_*`)
+
+### Dimension consistency guard
+
+Incoming embeddings are validated for internal consistency and checked against
+existing collection dimension to fail fast on mismatches.
+
+### Scope limits
+
+- No hybrid BM25 logic in Story 5 (deferred to later story if needed).
+- No RAG prompt or LLM response generation yet (Story 6).
 
 ## Non-Confidentiality Rule
 

@@ -6,6 +6,7 @@ real estate valuation RAG assistant. The current implementation includes:
 - Story 2 PDF ingestion with page-level extraction metadata
 - Story 3 custom cleaning and normalization pipeline
 - Story 4 page-aware chunking and embedding adapters
+- Story 5 persistent vector indexing and metadata-filtered retrieval
 
 ## Implemented Scope
 
@@ -36,6 +37,13 @@ real estate valuation RAG assistant. The current implementation includes:
 - pluggable embedding adapter interface with:
   - local deterministic hash-based embeddings (default for CI/tests)
   - optional `remote_http` adapter guarded by env configuration
+
+### Story 5 (vector store)
+- `VectorStore` abstraction for `upsert`, `clear`, and `query`
+- persistent local Chroma backend (`ChromaVectorStore`)
+- idempotent upsert behavior keyed by deterministic `chunk_id`
+- metadata-filtered similarity search (`silo`, `doc_id`, etc.)
+- dimension consistency validation to prevent mixed vector sizes
 
 ## Technical Decisions (Phase 0)
 
@@ -174,6 +182,35 @@ vectors = client.embed([chunk.text for chunk in chunks])
 
 Remote configuration values must stay in local `.env` and never be committed.
 
+## Vector Store API (Story 5)
+
+```python
+from real_estate_rag.vector_store import ChromaVectorStore
+
+store = ChromaVectorStore("./vector_db", "valuation_chunks")
+store.upsert(chunks, vectors)
+hits = store.query(query_vector, top_k=3, metadata_filter={"silo": "comps"})
+```
+
+### Persistence behavior
+
+`ChromaVectorStore` uses a persistent on-disk path (`VECTOR_DB_PATH`) so indexed
+vectors remain available across process restarts when the same path and
+collection name are reused.
+
+### Minimal CLI hook (Story 5)
+
+```bash
+re-rag index-local --input-dir ./sample_data --vector-db-path ./vector_db --collection valuation_chunks
+re-rag query-local --question "cap rate for downtown office" --vector-db-path ./vector_db --collection valuation_chunks --top-k 3
+```
+
+Optional metadata filter:
+
+```bash
+re-rag query-local --question "lease activity" --silo offering_memo --top-k 3
+```
+
 ### Why not off-the-shelf load-and-chunk only?
 
 This corpus includes repeated report banners, page markers, short noisy pages,
@@ -210,5 +247,4 @@ pytest
 
 ## Next Stories
 
-- Story 5: vector database index and retrieval
-- Story 6+: RAG orchestration, demo surface, and presentation readiness
+- Story 6+: RAG orchestration, answer grounding/citations, demo surface, and presentation readiness

@@ -1,7 +1,7 @@
-# Design Decisions and Project Architecture (Stories 1-4)
+# Design Decisions and Project Architecture (Stories 1-5)
 
 This document captures baseline design decisions and the implemented contracts
-through Story 4.
+through Story 5.
 
 ## Story 1 Objectives
 
@@ -31,6 +31,13 @@ through Story 4.
 - Preserve full source metadata per chunk for downstream traceability.
 - Add overlap-aware chunk boundaries to reduce context loss at splits.
 - Provide pluggable embedding adapters with local CI-safe default.
+
+## Story 5 Objectives
+
+- Persist chunk embeddings in a real local vector database.
+- Support top-k similarity search with optional metadata filters.
+- Guarantee idempotent re-index behavior via stable chunk identity.
+- Keep integration testable with local ephemeral paths and no secrets.
 
 ## Design Decisions
 
@@ -120,6 +127,24 @@ through Story 4.
   adapter plus optional remote HTTP adapter.
 - **Why:** Keeps Story 4 testable without secrets/network while preserving a
   path to cloud provider integration.
+
+### 15) Vector database backend choice
+
+- **Decision:** Use persistent local Chroma for Story 5.
+- **Why:** Real vector indexing/retrieval with durable on-disk persistence and
+  straightforward local setup suitable for interview prototype constraints.
+
+### 16) Index idempotency policy
+
+- **Decision:** Upsert vectors by deterministic `chunk_id`.
+- **Why:** Re-running index pipelines updates existing points instead of creating
+  duplicate records.
+
+### 17) Query filtering policy
+
+- **Decision:** Support metadata equality filters (`silo`, `doc_id`, etc.) in
+  vector query path.
+- **Why:** Enables scoped retrieval over siloed corpora and improves precision.
 
 ## Planned Technical Stack (for Story 2+)
 
@@ -218,3 +243,19 @@ Implemented in Story 4:
 
 Out of scope in Story 4:
 - vector DB indexing/retrieval, ranking, and LLM generation
+
+## Story 5 Implementation Status
+
+Implemented in Story 5:
+- `VectorStore` abstraction (`upsert`, `clear`, `query`)
+- `ChromaVectorStore` persistent backend
+- dimension validation guard for embedding mismatch
+- metadata persistence and filter-based retrieval support
+- integration tests for persistence, filter narrowing, idempotent upsert, and
+  embedding alignment
+- minimal CLI hooks:
+  - `re-rag index-local`
+  - `re-rag query-local`
+
+Out of scope in Story 5:
+- hybrid retrieval ranking and RAG answer generation
