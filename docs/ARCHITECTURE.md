@@ -1,7 +1,7 @@
 # Architecture (Stories 1-2)
 
-This document records baseline design and implemented contracts through Story 5.
-Downstream stories (generation) extend this architecture.
+This document records baseline design and implemented contracts through Story 6.
+Downstream stories (demo UX and production hardening) extend this architecture.
 
 ## Planned Pipeline
 
@@ -180,6 +180,50 @@ existing collection dimension to fail fast on mismatches.
 
 - No hybrid BM25 logic in Story 5 (deferred to later story if needed).
 - No RAG prompt or LLM response generation yet (Story 6).
+
+## Story 6 RAG Orchestration Contract
+
+Story 6 adds the retrieval-to-generation path with explicit grounding and
+citations.
+
+### Core function
+
+- `RagEngine.answer(question, metadata_filter=None) -> RagResponse`
+- Returns:
+  - `answer_text`
+  - `citations` (`chunk_id`, `doc_id`, `page_span`, `score`)
+  - `insufficient_evidence` flag
+  - optional `raw_retrieved_chunks`
+
+### Prompting and grounding
+
+- Question is embedded using the active embedding adapter.
+- Vector store returns top-k chunks with optional metadata filters.
+- Prompt context includes:
+  - context id
+  - `chunk_id`
+  - `doc_id`
+  - `page_span`
+  - snippet text
+- Prompt instructs model to use only supplied snippets and avoid fabrication.
+
+### Context budget algorithm
+
+- Retrieval hits are processed in rank order.
+- Chunks are included while cumulative characters stay <= `max_context_chars`.
+- If top hit alone exceeds budget, it is trimmed and still included.
+- Lower-ranked chunks are dropped when budget is exhausted.
+
+### Safe no-evidence policy
+
+- If retrieval yields no hits after score filtering (`min_score`), engine
+  returns a safe message and sets `insufficient_evidence=True`.
+- In this path, LLM generation is skipped and citations are empty.
+
+### Scope limits
+
+- No caching, streaming, auth, or rate-limiting in Story 6.
+- No UI polish yet (Story 7).
 
 ## Non-Confidentiality Rule
 

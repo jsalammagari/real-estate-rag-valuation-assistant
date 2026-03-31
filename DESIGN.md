@@ -1,7 +1,7 @@
-# Design Decisions and Project Architecture (Stories 1-5)
+# Design Decisions and Project Architecture (Stories 1-6)
 
 This document captures baseline design decisions and the implemented contracts
-through Story 5.
+through Story 6.
 
 ## Story 1 Objectives
 
@@ -38,6 +38,13 @@ through Story 5.
 - Support top-k similarity search with optional metadata filters.
 - Guarantee idempotent re-index behavior via stable chunk identity.
 - Keep integration testable with local ephemeral paths and no secrets.
+
+## Story 6 Objectives
+
+- Implement retrieval-augmented generation orchestration end-to-end.
+- Enforce grounded answer generation with explicit citation outputs.
+- Provide safe no-evidence behavior for valuation-risk scenarios.
+- Keep default test path offline with deterministic embedding + stub LLM.
 
 ## Design Decisions
 
@@ -145,6 +152,25 @@ through Story 5.
 - **Decision:** Support metadata equality filters (`silo`, `doc_id`, etc.) in
   vector query path.
 - **Why:** Enables scoped retrieval over siloed corpora and improves precision.
+
+### 18) Citation contract strategy
+
+- **Decision:** Return structured citation objects from retrieval metadata
+  (`chunk_id`, `doc_id`, `page_span`, `score`) rather than free-form citation
+  text only.
+- **Why:** Keeps outputs machine-parseable and auditable for technical review.
+
+### 19) No-evidence safety policy
+
+- **Decision:** If no qualifying retrieval context exists, skip LLM generation
+  and return explicit `insufficient_evidence=True` with a safe message.
+- **Why:** Reduces hallucination risk in valuation-oriented usage.
+
+### 20) Context budget policy
+
+- **Decision:** Rank-ordered chunk inclusion under a character budget with
+  top-hit trimming fallback.
+- **Why:** Deterministic and simple context control before advanced reranking.
 
 ## Planned Technical Stack (for Story 2+)
 
@@ -259,3 +285,17 @@ Implemented in Story 5:
 
 Out of scope in Story 5:
 - hybrid retrieval ranking and RAG answer generation
+
+## Story 6 Implementation Status
+
+Implemented in Story 6:
+- `RagEngine`, `RagConfig`, `RagResponse`, `Citation`
+- LLM adapter interface with `StubLlmClient` and optional `RemoteHTTPLlmClient`
+- grounded prompt construction including context metadata and snippet text
+- context budgeting and minimum score filtering
+- explicit no-evidence refusal path with `insufficient_evidence` flag
+- unit tests validating grounding, citation linkage, filter passthrough, and
+  no-evidence safety behavior
+
+Out of scope in Story 6:
+- production auth/rate limiting/caching/streaming and UI polish

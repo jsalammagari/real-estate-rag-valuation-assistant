@@ -7,6 +7,7 @@ real estate valuation RAG assistant. The current implementation includes:
 - Story 3 custom cleaning and normalization pipeline
 - Story 4 page-aware chunking and embedding adapters
 - Story 5 persistent vector indexing and metadata-filtered retrieval
+- Story 6 RAG orchestration with grounding, citations, and safe no-evidence behavior
 
 ## Implemented Scope
 
@@ -44,6 +45,13 @@ real estate valuation RAG assistant. The current implementation includes:
 - idempotent upsert behavior keyed by deterministic `chunk_id`
 - metadata-filtered similarity search (`silo`, `doc_id`, etc.)
 - dimension consistency validation to prevent mixed vector sizes
+
+### Story 6 (RAG orchestration)
+- `RagEngine.answer(question, metadata_filter=None)` end-to-end flow
+- question embedding -> vector retrieval -> context assembly -> LLM generation
+- explicit citation objects (`chunk_id`, `doc_id`, `page_span`, `score`)
+- safe no-evidence path with `insufficient_evidence=True`
+- context budget controls (`RAG_TOP_K`, `RAG_MAX_CONTEXT_CHARS`, `RAG_MIN_SCORE`)
 
 ## Technical Decisions (Phase 0)
 
@@ -210,6 +218,41 @@ Optional metadata filter:
 ```bash
 re-rag query-local --question "lease activity" --silo offering_memo --top-k 3
 ```
+
+## RAG API (Story 6)
+
+```python
+from real_estate_rag.embedding import LocalHashEmbeddingClient
+from real_estate_rag.rag import RagConfig, RagEngine, StubLlmClient
+from real_estate_rag.vector_store import ChromaVectorStore
+
+engine = RagEngine(
+    embedding_client=LocalHashEmbeddingClient(dimensions=12),
+    vector_store=ChromaVectorStore("./vector_db", "valuation_chunks"),
+    llm_client=StubLlmClient(),
+    config=RagConfig(top_k=4, max_context_chars=1400, min_score=0.0),
+)
+response = engine.answer("What cap rate evidence exists?", metadata_filter={"silo": "comps"})
+```
+
+### Citation format
+
+Each `Citation` returned in `RagResponse.citations` includes:
+- `chunk_id`
+- `doc_id`
+- `page_span` `(start_page, end_page)`
+- `score`
+
+This keeps answers auditable for technical stakeholders and allows business
+stakeholders to trust that statements are grounded in indexed evidence.
+
+### Trust boundaries and safety behavior
+
+- RAG prompts instruct the model to use only provided snippets.
+- If retrieval returns no usable evidence (or everything is below `RAG_MIN_SCORE`),
+  `RagEngine` returns an explicit safe response with
+  `insufficient_evidence=True` and no citations.
+- Story 6 does not claim valuation certainty without supporting context.
 
 ### Why not off-the-shelf load-and-chunk only?
 
