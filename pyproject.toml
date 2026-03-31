@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "real-estate-rag-valuation-assistant"
+version = "0.1.0"
+description = "Prototype scaffold for a real estate valuation RAG assistant."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Project Team" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[project.scripts]
+re-rag = "real_estate_rag.cli.main:app"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
