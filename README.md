@@ -11,6 +11,11 @@ real estate valuation RAG assistant. The current implementation includes:
 - Story 7 demo-ready CLI surface and runbook
 - Story 8 test hardening, automation commands, and CI smoke checks
 
+The prototype addresses a practical blocker: valuation-relevant data is trapped
+in siloed unstructured PDFs, so we implement a custom ingestion/cleaning path
+before retrieval and generation. This repository is an educational prototype and
+not valuation advice.
+
 ## Implemented Scope
 
 ### Story 1 (foundation)
@@ -103,6 +108,15 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
+
+## Documentation
+
+- `docs/ARCHITECTURE.md`: end-to-end architecture, data flow, and decision log
+- `docs/ROADMAP.md`: prototype-to-production plan with GCP-forward options
+- `docs/COMPLIANCE.md`: confidentiality/data handling dos and don'ts
+- `docs/DEMO.md`: demo script and screen-share-safe runbook
+- `docs/FAQ.md`: short technical Q&A primer for likely reviewer questions
+- `CONTRIBUTING.md`: test/lint/CI commands and marker policy
 
 ## CLI Commands
 
@@ -324,11 +338,13 @@ make ci
 
 ## Design and Architecture Docs
 
-- `DESIGN.md` - design decisions and architecture baseline updated through Story 7
-- `docs/ARCHITECTURE.md` - architecture contracts through Story 8
-- `docs/DEMO.md` - demo script and runbook for Story 7
+- `DESIGN.md` - design decisions and architecture baseline updated through Story 8
+- `docs/ARCHITECTURE.md` - architecture contracts through Story 9 doc pass
+- `docs/ROADMAP.md` - production-oriented roadmap and business outcomes
+- `docs/COMPLIANCE.md` - confidentiality and data handling policy
+- `docs/DEMO.md` - demo script and runbook
 - `CONTRIBUTING.md` - contributor commands, marker policy, and failure guidance
 
 ## Next Stories
 
-- Story 9+: documentation deepening, presentation package, and readiness rehearsals
+- Story 10+: presentation package and rehearsal/readiness workflows

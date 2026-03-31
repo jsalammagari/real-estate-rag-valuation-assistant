@@ -1,7 +1,7 @@
-# Design Decisions and Project Architecture (Stories 1-8)
+# Design Decisions and Project Architecture (Stories 1-9)
 
 This document captures baseline design decisions and the implemented contracts
-through Story 8.
+through Story 9.
 
 ## Story 1 Objectives
 
@@ -59,6 +59,12 @@ through Story 8.
 - Add regression guards for common failure modes in demo workflows.
 - Ensure default test suite remains offline and deterministic.
 - Add CI automation that mirrors local lint/test commands.
+
+## Story 9 Objectives
+
+- Produce stakeholder-ready technical docs for architecture and roadmap review.
+- Add explicit confidentiality guidance suitable for external sharing.
+- Keep docs aligned with implemented CLI/module contracts.
 
 ## Design Decisions
 
@@ -203,6 +209,13 @@ through Story 8.
 - **Decision:** GitHub Actions runs the same `make lint`, `make test`, and
   `make test-e2e` commands used locally.
 - **Why:** Reduces "works locally but fails in CI" drift.
+
+### 24) Documentation strategy
+
+- **Decision:** Maintain dedicated docs for architecture, roadmap, compliance,
+  demo, and contributor workflows instead of overloading README.
+- **Why:** Supports technical deep-dive and business audience needs with clearer
+  navigation and lower maintenance risk.
 
 ## Planned Technical Stack (for Story 2+)
 
@@ -358,3 +371,17 @@ Implemented in Story 8:
 
 Out of scope in Story 8:
 - load/perf testing, security testing, and model-quality benchmark suites
+
+## Story 9 Implementation Status
+
+Implemented in Story 9:
+- Expanded `docs/ARCHITECTURE.md` with Mermaid data-flow, package mapping, and
+  explicit decision log/trade-offs.
+- Added `docs/ROADMAP.md` with prototype-to-production phases and GCP-forward
+  options.
+- Added `docs/COMPLIANCE.md` with confidentiality/data policy do/don't rules.
+- Added `docs/FAQ.md` for concise technical Q&A prep.
+- Polished `README.md` navigation and scope statement.
+
+Out of scope in Story 9:
+- full slide deck authoring and presentation script delivery
