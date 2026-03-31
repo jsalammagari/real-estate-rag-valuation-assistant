@@ -1,7 +1,7 @@
-# Design Decisions and Project Architecture (Story 1)
+# Design Decisions and Project Architecture (Stories 1-2)
 
-This document captures the baseline design for Story 1 only. It defines the
-scaffold and architectural direction before feature implementation begins.
+This document captures baseline design decisions and the Story 2 ingestion
+implementation contract.
 
 ## Story 1 Objectives
 
@@ -10,6 +10,13 @@ scaffold and architectural direction before feature implementation begins.
 - Add a placeholder CLI entrypoint for future operator workflows.
 - Set git and environment hygiene to prevent secrets/cached artifacts in source.
 - Record technical decisions so Story 2+ can implement consistently.
+
+## Story 2 Objectives
+
+- Discover PDFs recursively from configured input directories.
+- Extract page-level text with strict page boundaries.
+- Emit stable `doc_id` and provenance metadata for downstream stages.
+- Flag low-text pages via machine-readable warnings for future OCR routing.
 
 ## Design Decisions
 
@@ -50,6 +57,17 @@ scaffold and architectural direction before feature implementation begins.
 - **Decision:** Use synthetic/publicly shareable sample inputs only.
 - **Why:** Meets assignment confidentiality constraints and keeps repo safe for
   interview sharing.
+
+### 7) Stable document identity
+
+- **Decision:** Use SHA-256 hash of file bytes for `doc_id`.
+- **Why:** Deterministic identity across repeated ingestions supports idempotent
+  indexing in later stories.
+
+### 8) Page indexing convention
+
+- **Decision:** Use 1-based page indexing in extraction output.
+- **Why:** Aligns with how users reference page numbers in documents and demos.
 
 ## Planned Technical Stack (for Story 2+)
 
@@ -101,3 +119,17 @@ Implemented in Story 1:
 
 Out of scope for Story 1:
 - PDF parsing, cleaning, chunking, embeddings, vector indexing, RAG responses
+
+## Story 2 Implementation Status
+
+Implemented in Story 2:
+- `discover_pdf_files`: recursive, deterministic PDF discovery
+- `extract_pdf_document`: page-level extraction with warning signals
+- `ingest_pdf_directory`: directory-level ingestion orchestration
+- dataclass output contracts: `IngestedDocument`, `PageExtraction`
+- tests for discovery, silo inference, page boundaries, stable `doc_id`, and
+  low-text scan suspicion behavior
+
+Out of scope in Story 2:
+- OCR execution, cleaning, normalization, deduplication, chunking, embeddings,
+  vector DB integration, and response generation
