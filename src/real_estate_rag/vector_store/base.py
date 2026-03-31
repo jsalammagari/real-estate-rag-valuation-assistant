@@ -33,3 +33,6 @@ class VectorStore:
         metadata_filter: dict[str, object] | None = None,
     ) -> tuple[SearchResult, ...]:
         raise NotImplementedError
+
+    def count(self) -> int:
+        raise NotImplementedError

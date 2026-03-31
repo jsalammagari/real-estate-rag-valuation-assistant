@@ -1,7 +1,7 @@
-# Design Decisions and Project Architecture (Stories 1-6)
+# Design Decisions and Project Architecture (Stories 1-7)
 
 This document captures baseline design decisions and the implemented contracts
-through Story 6.
+through Story 7.
 
 ## Story 1 Objectives
 
@@ -45,6 +45,13 @@ through Story 6.
 - Enforce grounded answer generation with explicit citation outputs.
 - Provide safe no-evidence behavior for valuation-risk scenarios.
 - Keep default test path offline with deterministic embedding + stub LLM.
+
+## Story 7 Objectives
+
+- Expose a stable CLI demo path for ingest -> index -> ask.
+- Ensure deterministic stub-mode rehearsal without paid APIs.
+- Provide concise demo runbook with screen-share-safe instructions.
+- Return explicit non-zero CLI exits for common operator errors.
 
 ## Design Decisions
 
@@ -171,6 +178,12 @@ through Story 6.
 - **Decision:** Rank-ordered chunk inclusion under a character budget with
   top-hit trimming fallback.
 - **Why:** Deterministic and simple context control before advanced reranking.
+
+### 21) Demo UX strategy
+
+- **Decision:** Keep a terminal-first CLI as the primary demo surface.
+- **Why:** Lower operational complexity and stronger live keyboard-skill signal
+  for interview scenarios.
 
 ## Planned Technical Stack (for Story 2+)
 
@@ -299,3 +312,17 @@ Implemented in Story 6:
 
 Out of scope in Story 6:
 - production auth/rate limiting/caching/streaming and UI polish
+
+## Story 7 Implementation Status
+
+Implemented in Story 7:
+- CLI subcommands: `create-sample-data`, `ingest`, `index`, `ask`
+- alias compatibility for legacy commands (`index-local`, `query-local`)
+- formatted answer + citation output in `ask`
+- non-zero error exits for missing index path, empty collections, and invalid
+  input conditions
+- demo runbook (`docs/DEMO.md`) with 3-command flow and screen-share hygiene
+- CLI smoke tests for subcommand discovery, end-to-end stub run, and error path
+
+Out of scope in Story 7:
+- web UI polishing, authentication, analytics, and deployment manifests

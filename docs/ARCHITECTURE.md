@@ -1,7 +1,8 @@
 # Architecture (Stories 1-2)
 
-This document records baseline design and implemented contracts through Story 6.
-Downstream stories (demo UX and production hardening) extend this architecture.
+This document records baseline design and implemented contracts through Story 7.
+Downstream stories (presentation hardening and production concerns) extend this
+architecture.
 
 ## Planned Pipeline
 
@@ -224,6 +225,24 @@ citations.
 
 - No caching, streaming, auth, or rate-limiting in Story 6.
 - No UI polish yet (Story 7).
+
+## Story 7 Demo Surface Contract
+
+Story 7 adds a stable operator-facing CLI for interview demos.
+
+### Supported CLI commands
+
+- `create-sample-data`: generate synthetic non-confidential demo PDFs
+- `ingest`: run ingestion-only inspection and summary
+- `index`: run ingestion -> cleaning -> chunking -> embedding -> vector upsert
+- `ask`: run RAG answer path and print answer + structured citations
+
+### Demo reliability boundaries
+
+- Stub mode supported end-to-end (`EMBEDDING_PROVIDER=local`,
+  `LLM_PROVIDER=stub`) with no paid APIs.
+- `ask` returns non-zero on missing vector path, empty index, or bad config.
+- Citation lines include `chunk_id`, `doc_id`, and `page_span` for auditability.
 
 ## Non-Confidentiality Rule
 

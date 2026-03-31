@@ -8,6 +8,7 @@ real estate valuation RAG assistant. The current implementation includes:
 - Story 4 page-aware chunking and embedding adapters
 - Story 5 persistent vector indexing and metadata-filtered retrieval
 - Story 6 RAG orchestration with grounding, citations, and safe no-evidence behavior
+- Story 7 demo-ready CLI surface and runbook
 
 ## Implemented Scope
 
@@ -53,6 +54,12 @@ real estate valuation RAG assistant. The current implementation includes:
 - safe no-evidence path with `insufficient_evidence=True`
 - context budget controls (`RAG_TOP_K`, `RAG_MAX_CONTEXT_CHARS`, `RAG_MIN_SCORE`)
 
+### Story 7 (demo surface)
+- interview-ready CLI flow: `create-sample-data` -> `index` -> `ask`
+- `ingest` inspection command for quick data sanity checks
+- non-zero CLI exits for missing index path / empty corpus / config issues
+- demo runbook in `docs/DEMO.md` with screen-share-safe guidance
+
 ## Technical Decisions (Phase 0)
 
 - **Language/runtime:** Python 3.10+
@@ -89,11 +96,14 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-## CLI (placeholder)
+## CLI Commands
 
 ```bash
 re-rag --help
 re-rag --version
+re-rag ingest --help
+re-rag index --help
+re-rag ask --help
 ```
 
 ## Ingestion API (Story 2)
@@ -254,6 +264,17 @@ stakeholders to trust that statements are grounded in indexed evidence.
   `insufficient_evidence=True` and no citations.
 - Story 6 does not claim valuation certainty without supporting context.
 
+## Demo in 3 Commands (Story 7)
+
+```bash
+re-rag create-sample-data --output-dir ./sample_data
+re-rag index --input-dir ./sample_data --vector-db-path ./vector_db --collection valuation_chunks --embedding-provider local --embedding-dimensions 12
+re-rag ask --question "What cap rate evidence exists?" --vector-db-path ./vector_db --collection valuation_chunks --embedding-provider local --embedding-dimensions 12 --llm-provider stub --top-k 3
+```
+
+See `docs/DEMO.md` for timing script, expected output format, fallback mode, and
+screen-share hygiene.
+
 ### Why not off-the-shelf load-and-chunk only?
 
 This corpus includes repeated report banners, page markers, short noisy pages,
@@ -285,8 +306,9 @@ pytest
 
 ## Design and Architecture Docs
 
-- `DESIGN.md` - design decisions and architecture baseline updated through Story 2
-- `docs/ARCHITECTURE.md` - architecture notes and ingestion contract
+- `DESIGN.md` - design decisions and architecture baseline updated through Story 7
+- `docs/ARCHITECTURE.md` - architecture contracts through Story 6
+- `docs/DEMO.md` - demo script and runbook for Story 7
 
 ## Next Stories
 

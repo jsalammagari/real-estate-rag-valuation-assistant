@@ -79,6 +79,9 @@ class ChromaVectorStore(VectorStore):
             )
         return tuple(output)
 
+    def count(self) -> int:
+        return int(self._collection.count())
+
     def get_embeddings(self, chunk_ids: list[str]) -> list[list[float]]:
         """Return stored embeddings for test and validation flows."""
         result = self._collection.get(ids=chunk_ids, include=["embeddings"])

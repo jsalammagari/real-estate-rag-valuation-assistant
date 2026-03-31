@@ -15,7 +15,7 @@ class RagConfig:
 
     top_k: int = 4
     max_context_chars: int = 1400
-    min_score: float = 0.0
+    min_score: float = -1.0
 
 
 @dataclass(frozen=True)
