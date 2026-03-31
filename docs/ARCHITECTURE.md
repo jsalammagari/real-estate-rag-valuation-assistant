@@ -1,8 +1,8 @@
 # Architecture (Stories 1-2)
 
-This document records the baseline design and implemented Story 2 ingestion
-contract. Downstream stories (cleaning/chunking/retrieval/generation) extend
-this architecture.
+This document records baseline design and implemented Story 2 and Story 3
+contracts. Downstream stories (chunking/retrieval/generation) extend this
+architecture.
 
 ## Planned Pipeline
 
@@ -58,6 +58,42 @@ logic runs at this stage.
 - No OCR execution in Story 2 (only machine-readable scan suspicion flags).
 - No normalization or deduplication yet; raw text is intentionally preserved.
 - No table reconstruction or layout repair yet.
+
+## Story 3 Cleaning Contract
+
+Story 3 consumes `IngestedDocument` records from Story 2 and outputs deterministic
+`CleanSegment` records for chunking in Story 4.
+
+### Pipeline stage order
+
+1. Build repeated edge-line frequency map (header/footer candidates)
+2. Remove repeated edge lines and page-number-only lines
+3. Normalize conservative patterns (currency, date, area units, cap-rate hint)
+4. Infer coarse content type (`narrative` vs `table_like`) via heuristic cues
+5. Apply quality gates (min length) and near-duplicate suppression
+6. Emit `CleanSegment` with source metadata and warnings
+
+### CleanSegment schema
+
+- `text`: cleaned normalized text
+- `doc_id`: source document id
+- `page_span`: inclusive page range tuple
+- `silo`: source silo
+- `content_type`: `narrative` or `table_like`
+- `normalized_fields`: normalized hints dictionary
+- `warnings`: combined warnings from source + cleaning stages
+
+### Determinism guarantee
+
+Given the same input extraction payload and config, the cleaner returns the same
+ordered output segments. No randomness is used in v1.
+
+### Why this custom path (instead of chunk-only ingestion)
+
+Standard load-and-chunk indexing preserves repeated report banners, page number
+lines, noisy short fragments, and inconsistent numeric/date/area formatting.
+These artifacts dilute retrieval quality. Story 3 addresses this with targeted
+noise suppression, conservative normalization, and dedupe before chunking.
 
 ## Non-Confidentiality Rule
 

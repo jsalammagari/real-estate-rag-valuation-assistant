@@ -1,8 +1,10 @@
 # Real Estate RAG Valuation Assistant
 
 This repository contains a fictional, non-confidential prototype for a custom
-real estate valuation RAG assistant. The current implementation includes Story
-1 foundations and Story 2 PDF ingestion with page-level extraction metadata.
+real estate valuation RAG assistant. The current implementation includes:
+- Story 1 foundations
+- Story 2 PDF ingestion with page-level extraction metadata
+- Story 3 custom cleaning and normalization pipeline
 
 ## Implemented Scope
 
@@ -18,6 +20,13 @@ real estate valuation RAG assistant. The current implementation includes Story
 - page-level extraction with 1-based page index and per-page text
 - inferred `silo` metadata from top-level folder under input root
 - machine-readable warnings for low-text or empty pages
+
+### Story 3 (cleaning and normalization)
+- repeated header/footer and page-number suppression (best effort)
+- conservative normalization for currency/date/square-foot unit variants
+- content typing heuristic (`narrative` vs `table_like`)
+- quality gates (minimum text length) and near-duplicate suppression
+- stable `CleanSegment` output contract for Story 4 chunking
 
 ## Technical Decisions (Phase 0)
 
@@ -86,6 +95,51 @@ for doc in docs:
 - `PageExtraction.text`: raw extracted page text (no cleaning in Story 2)
 - `PageExtraction.scan_suspected`: `True` for low-text pages (routing signal for OCR in later stories)
 
+## Cleaning API (Story 3)
+
+```python
+from real_estate_rag.cleaning import CleaningConfig, clean_documents
+from real_estate_rag.ingestion import ingest_pdf_directory
+
+docs = ingest_pdf_directory("./sample_data")
+segments = clean_documents(docs, CleaningConfig(min_text_length=20))
+for segment in segments:
+    print(segment.doc_id, segment.page_span, segment.silo, segment.content_type)
+```
+
+### CleanSegment Output Contract
+
+- `text`: cleaned and normalized segment text
+- `doc_id`: source document id from ingestion
+- `page_span`: inclusive source page range (Story 3 uses single-page spans)
+- `silo`: source silo label from ingestion
+- `content_type`: heuristic label (`narrative` or `table_like`)
+- `normalized_fields`: extracted normalized hints (e.g., `date_example`, `currency_example`, `cap_rate`)
+- `warnings`: combined stage + source warnings
+
+### Why not off-the-shelf load-and-chunk only?
+
+This corpus includes repeated report banners, page markers, short noisy pages,
+and formatting inconsistency (`$ 1,250,000`, `3/7/2025`, `12500 SF`). A
+chunk-only approach would index these artifacts as-is, increasing retrieval
+noise. Story 3 removes repetitive boilerplate, normalizes conservative patterns,
+and suppresses near duplicates before chunking so downstream retrieval quality
+is more stable.
+
+### Before vs After (synthetic example)
+
+**Before (raw page text):**
+```text
+CONFIDENTIAL REPORT
+NOI noted on 3/7/2025 at $ 1,250,000 for 12500 SF
+Page 1 of 2
+```
+
+**After (clean segment text):**
+```text
+NOI noted on 2025-03-07 at $1,250,000 for 12500 sqft
+```
+
 ## Basic Checks
 
 ```bash
@@ -99,5 +153,4 @@ pytest
 
 ## Next Stories
 
-- Story 3: custom cleaning and normalization pipeline
 - Story 4+: chunking, embeddings, vector DB, RAG orchestration, demo

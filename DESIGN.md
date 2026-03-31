@@ -1,7 +1,7 @@
-# Design Decisions and Project Architecture (Stories 1-2)
+# Design Decisions and Project Architecture (Stories 1-3)
 
-This document captures baseline design decisions and the Story 2 ingestion
-implementation contract.
+This document captures baseline design decisions and the implemented contracts
+through Story 3.
 
 ## Story 1 Objectives
 
@@ -17,6 +17,13 @@ implementation contract.
 - Extract page-level text with strict page boundaries.
 - Emit stable `doc_id` and provenance metadata for downstream stages.
 - Flag low-text pages via machine-readable warnings for future OCR routing.
+
+## Story 3 Objectives
+
+- Convert raw page text into cleaner, deduplicated, metadata-rich segments.
+- Apply conservative normalization for valuation-relevant formats.
+- Preserve source traceability (`doc_id`, `page_span`, `silo`, warnings).
+- Produce deterministic `CleanSegment` output contract for Story 4 chunking.
 
 ## Design Decisions
 
@@ -68,6 +75,24 @@ implementation contract.
 
 - **Decision:** Use 1-based page indexing in extraction output.
 - **Why:** Aligns with how users reference page numbers in documents and demos.
+
+### 9) Cleaning strategy
+
+- **Decision:** Use deterministic, pure-function pipeline stages.
+- **Why:** Ensures reproducible output and unit-testability without external
+  services, APIs, embeddings, or model dependencies.
+
+### 10) Normalization policy
+
+- **Decision:** Normalize only conservative, low-risk patterns (currency spacing,
+  date formats, area-unit variants, cap-rate hint extraction).
+- **Why:** Improves retrieval consistency while avoiding semantic invention.
+
+### 11) Dedupe policy
+
+- **Decision:** Suppress near-duplicate segments within a document using token
+  similarity threshold.
+- **Why:** Reduces index noise and redundant retrieval context for later stages.
 
 ## Planned Technical Stack (for Story 2+)
 
@@ -133,3 +158,20 @@ Implemented in Story 2:
 Out of scope in Story 2:
 - OCR execution, cleaning, normalization, deduplication, chunking, embeddings,
   vector DB integration, and response generation
+
+## Story 3 Implementation Status
+
+Implemented in Story 3:
+- `CleanSegment` and `CleaningConfig` contracts
+- deterministic cleaning stage pipeline
+- repeated header/footer and page-number suppression
+- conservative normalization for currency/date/area units and cap-rate hint
+- content-type heuristic (`narrative` vs `table_like`)
+- quality gate for short/noisy text and near-duplicate suppression
+- warning propagation from ingestion to cleaned segments
+- unit tests for noise handling, normalization, quality gates, dedupe, and
+  metadata/warning passthrough
+
+Out of scope in Story 3:
+- chunking overlap policies, embeddings, vector index integration, retrieval,
+  and generation
