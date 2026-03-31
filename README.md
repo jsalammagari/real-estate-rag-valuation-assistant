@@ -5,6 +5,7 @@ real estate valuation RAG assistant. The current implementation includes:
 - Story 1 foundations
 - Story 2 PDF ingestion with page-level extraction metadata
 - Story 3 custom cleaning and normalization pipeline
+- Story 4 page-aware chunking and embedding adapters
 
 ## Implemented Scope
 
@@ -27,6 +28,14 @@ real estate valuation RAG assistant. The current implementation includes:
 - content typing heuristic (`narrative` vs `table_like`)
 - quality gates (minimum text length) and near-duplicate suppression
 - stable `CleanSegment` output contract for Story 4 chunking
+
+### Story 4 (chunking and embedding)
+- deterministic character-based chunking with configurable overlap
+- stable chunk IDs derived from source metadata and chunk text
+- full metadata inheritance from `CleanSegment` to each chunk
+- pluggable embedding adapter interface with:
+  - local deterministic hash-based embeddings (default for CI/tests)
+  - optional `remote_http` adapter guarded by env configuration
 
 ## Technical Decisions (Phase 0)
 
@@ -117,6 +126,54 @@ for segment in segments:
 - `normalized_fields`: extracted normalized hints (e.g., `date_example`, `currency_example`, `cap_rate`)
 - `warnings`: combined stage + source warnings
 
+## Chunking API (Story 4)
+
+```python
+from real_estate_rag.chunking import ChunkingConfig, chunk_segments
+
+chunks = chunk_segments(
+    segments,
+    ChunkingConfig(max_chunk_chars=300, overlap_chars=40),
+)
+```
+
+### TextChunk Output Contract
+
+- `chunk_id`: deterministic SHA-256 id
+- `text`: retrieval-sized chunk text
+- `doc_id`, `page_span`, `silo`: source traceability fields
+- `content_type`, `normalized_fields`: inherited content hints
+- `source_warnings`: inherited warnings from cleaned source
+- `chunk_index`, `total_chunks_for_segment`: position metadata
+
+### Chunking defaults
+
+- `max_chunk_chars=300`
+- `overlap_chars=40`
+- Character-based splitting for deterministic, model-agnostic behavior
+
+## Embedding Adapter API (Story 4)
+
+```python
+from real_estate_rag.embedding import create_embedding_client_from_env
+
+client = create_embedding_client_from_env(provider="local", dimensions=12)
+vectors = client.embed([chunk.text for chunk in chunks])
+```
+
+### Embedding provider switch
+
+- Local deterministic path (no secrets, default for tests):
+  - `EMBEDDING_PROVIDER=local`
+  - `EMBEDDING_DIMENSIONS=12`
+- Optional remote HTTP path (when integrated with a provider endpoint):
+  - `EMBEDDING_PROVIDER=remote_http`
+  - `EMBEDDING_API_BASE_URL=<provider-endpoint>`
+  - `EMBEDDING_MODEL=<model-name>`
+  - `EMBEDDING_API_KEY=<secret>`
+
+Remote configuration values must stay in local `.env` and never be committed.
+
 ### Why not off-the-shelf load-and-chunk only?
 
 This corpus includes repeated report banners, page markers, short noisy pages,
@@ -153,4 +210,5 @@ pytest
 
 ## Next Stories
 
-- Story 4+: chunking, embeddings, vector DB, RAG orchestration, demo
+- Story 5: vector database index and retrieval
+- Story 6+: RAG orchestration, demo surface, and presentation readiness

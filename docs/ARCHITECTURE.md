@@ -1,8 +1,7 @@
 # Architecture (Stories 1-2)
 
-This document records baseline design and implemented Story 2 and Story 3
-contracts. Downstream stories (chunking/retrieval/generation) extend this
-architecture.
+This document records baseline design and implemented contracts through Story 4.
+Downstream stories (vector retrieval/generation) extend this architecture.
 
 ## Planned Pipeline
 
@@ -94,6 +93,51 @@ Standard load-and-chunk indexing preserves repeated report banners, page number
 lines, noisy short fragments, and inconsistent numeric/date/area formatting.
 These artifacts dilute retrieval quality. Story 3 addresses this with targeted
 noise suppression, conservative normalization, and dedupe before chunking.
+
+## Story 4 Chunking and Embedding Contract
+
+Story 4 converts `CleanSegment` outputs into deterministic, overlapping chunks
+and provides pluggable embedding adapters.
+
+### Chunking rules
+
+- Character-based chunking with config:
+  - `max_chunk_chars` (default: 300)
+  - `overlap_chars` (default: 40)
+- Deterministic boundaries and ordering for same input/config.
+- No cross-segment merging in v1 (each segment chunked independently).
+- Stable `chunk_id` derived from source metadata + chunk index + chunk text.
+
+### TextChunk schema
+
+- `chunk_id`
+- `text`
+- `doc_id`
+- `page_span`
+- `silo`
+- `content_type`
+- `normalized_fields`
+- `source_warnings`
+- `chunk_index`
+- `total_chunks_for_segment`
+
+### Citation granularity implication
+
+Chunk boundaries set the granularity of future citations in Story 6. Smaller
+chunks improve pinpoint traceability but may reduce contextual recall; overlap
+mitigates boundary loss.
+
+### Embedding adapter contract
+
+- Interface: `embed(texts: list[str]) -> list[list[float]]`
+- Local adapter (`LocalHashEmbeddingClient`): deterministic pseudo-vectors for
+  CI and offline tests.
+- Optional remote adapter (`RemoteHTTPEmbeddingClient`): HTTP POST to configured
+  endpoint with model and API key from environment variables.
+
+### Isolation boundary
+
+Story 4 does not import or depend on vector DB, retrieval ranking, or LLM code.
 
 ## Non-Confidentiality Rule
 

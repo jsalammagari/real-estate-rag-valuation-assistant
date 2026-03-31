@@ -1,7 +1,7 @@
-# Design Decisions and Project Architecture (Stories 1-3)
+# Design Decisions and Project Architecture (Stories 1-4)
 
 This document captures baseline design decisions and the implemented contracts
-through Story 3.
+through Story 4.
 
 ## Story 1 Objectives
 
@@ -24,6 +24,13 @@ through Story 3.
 - Apply conservative normalization for valuation-relevant formats.
 - Preserve source traceability (`doc_id`, `page_span`, `silo`, warnings).
 - Produce deterministic `CleanSegment` output contract for Story 4 chunking.
+
+## Story 4 Objectives
+
+- Convert cleaned segments into deterministic retrieval-sized chunks.
+- Preserve full source metadata per chunk for downstream traceability.
+- Add overlap-aware chunk boundaries to reduce context loss at splits.
+- Provide pluggable embedding adapters with local CI-safe default.
 
 ## Design Decisions
 
@@ -93,6 +100,26 @@ through Story 3.
 - **Decision:** Suppress near-duplicate segments within a document using token
   similarity threshold.
 - **Why:** Reduces index noise and redundant retrieval context for later stages.
+
+### 12) Chunking strategy
+
+- **Decision:** Use deterministic character-based splitting with overlap.
+- **Why:** Predictable behavior across environments and model-agnostic control
+  over chunk size before introducing tokenizer-coupled behavior.
+
+### 13) Chunk identity strategy
+
+- **Decision:** Build `chunk_id` as SHA-256 over source metadata + chunk index
+  + chunk text.
+- **Why:** Stable IDs improve idempotent indexing and traceability in later
+  vector-store stories.
+
+### 14) Embedding abstraction strategy
+
+- **Decision:** Introduce `EmbeddingClient` interface with local deterministic
+  adapter plus optional remote HTTP adapter.
+- **Why:** Keeps Story 4 testable without secrets/network while preserving a
+  path to cloud provider integration.
 
 ## Planned Technical Stack (for Story 2+)
 
@@ -175,3 +202,19 @@ Implemented in Story 3:
 Out of scope in Story 3:
 - chunking overlap policies, embeddings, vector index integration, retrieval,
   and generation
+
+## Story 4 Implementation Status
+
+Implemented in Story 4:
+- `TextChunk` and `ChunkingConfig` contracts
+- deterministic, overlap-aware chunking pipeline (`chunk_segments`)
+- stable chunk id generation
+- metadata inheritance from `CleanSegment` to every chunk
+- embedding adapter interface (`EmbeddingClient`)
+- local deterministic hash embedding adapter for CI/tests
+- optional remote HTTP embedding adapter guarded by runtime config
+- unit tests for chunk boundaries, overlap, determinism, metadata carryover,
+  and embedding shape/determinism
+
+Out of scope in Story 4:
+- vector DB indexing/retrieval, ranking, and LLM generation

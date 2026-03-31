@@ -1,1 +1,5 @@
-"""Chunking package placeholder for upcoming stories."""
+"""Chunking exports."""
+
+from .pipeline import ChunkingConfig, TextChunk, chunk_segments
+
+__all__ = ["ChunkingConfig", "TextChunk", "chunk_segments"]
