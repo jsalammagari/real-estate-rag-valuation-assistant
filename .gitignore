@@ -33,3 +33,8 @@ vector_db/
 .DS_Store
 .idea/
 .vscode/
+
+# Binary documents (synthetic PDFs and decks; regenerate via scripts or presentation/)
+*.pdf
+*.pptx
+*.ppt

@@ -1,134 +1,398 @@
 # Real Estate RAG Valuation Assistant
 
-This repository contains a fictional, non-confidential prototype for a custom
-real estate valuation RAG assistant. The current implementation includes:
-- Story 1 foundations
-- Story 2 PDF ingestion with page-level extraction metadata
-- Story 3 custom cleaning and normalization pipeline
-- Story 4 page-aware chunking and embedding adapters
-- Story 5 persistent vector indexing and metadata-filtered retrieval
-- Story 6 RAG orchestration with grounding, citations, and safe no-evidence behavior
-- Story 7 demo-ready CLI surface and runbook
-- Story 8 test hardening, automation commands, and CI smoke checks
+This repository contains a prototype for a custom real estate valuation RAG assistant, built for a **Google Cloud Practice Customer Engineer interview**.
 
-The prototype addresses a practical blocker: valuation-relevant data is trapped
-in siloed unstructured PDFs, so we implement a custom ingestion/cleaning path
-before retrieval and generation. This repository is an educational prototype and
-not valuation advice.
+## The Problem
 
-## Implemented Scope
+> A large real estate customer has valuable property data trapped in siloed, unstructured PDF documents (appraisals, offering memos, lease abstracts, comparable sales). Standard RAG tools can't properly parse this messy data.
 
-### Story 1 (foundation)
-- installable package layout
-- placeholder CLI entrypoint
-- environment and git hygiene
-- architecture and technical decisions stub
+## The Solution
 
-### Story 2 (ingestion)
-- recursive PDF discovery from a configured input directory
-- stable SHA-256 `doc_id` generation from file bytes
-- page-level extraction with 1-based page index and per-page text
-- inferred `silo` metadata from top-level folder under input root
-- machine-readable warnings for low-text or empty pages
+A custom RAG (Retrieval-Augmented Generation) system that:
+1. **Ingests PDFs** from different "silos" (folders representing data sources)
+2. **Cleans and normalizes** messy real estate data (dates, currencies, areas)
+3. **Indexes** the cleaned content into a vector database
+4. **Answers questions** grounded in the actual documents
+5. **Provides citations** pointing back to exact documents and pages
 
-### Story 3 (cleaning and normalization)
-- repeated header/footer and page-number suppression (best effort)
-- conservative normalization for currency/date/square-foot unit variants
-- content typing heuristic (`narrative` vs `table_like`)
-- quality gates (minimum text length) and near-duplicate suppression
-- stable `CleanSegment` output contract for Story 4 chunking
+---
 
-### Story 4 (chunking and embedding)
-- deterministic character-based chunking with configurable overlap
-- stable chunk IDs derived from source metadata and chunk text
-- full metadata inheritance from `CleanSegment` to each chunk
-- pluggable embedding adapter interface with:
-  - local deterministic hash-based embeddings (default for CI/tests)
-  - optional `remote_http` adapter guarded by env configuration
+## Architecture Overview
 
-### Story 5 (vector store)
-- `VectorStore` abstraction for `upsert`, `clear`, and `query`
-- persistent local Chroma backend (`ChromaVectorStore`)
-- idempotent upsert behavior keyed by deterministic `chunk_id`
-- metadata-filtered similarity search (`silo`, `doc_id`, etc.)
-- dimension consistency validation to prevent mixed vector sizes
-
-### Story 6 (RAG orchestration)
-- `RagEngine.answer(question, metadata_filter=None)` end-to-end flow
-- question embedding -> vector retrieval -> context assembly -> LLM generation
-- explicit citation objects (`chunk_id`, `doc_id`, `page_span`, `score`)
-- safe no-evidence path with `insufficient_evidence=True`
-- context budget controls (`RAG_TOP_K`, `RAG_MAX_CONTEXT_CHARS`, `RAG_MIN_SCORE`)
-
-### Story 7 (demo surface)
-- interview-ready CLI flow: `create-sample-data` -> `index` -> `ask`
-- `ingest` inspection command for quick data sanity checks
-- non-zero CLI exits for missing index path / empty corpus / config issues
-- demo runbook in `docs/DEMO.md` with screen-share-safe guidance
-
-### Story 8 (test hardening and automation)
-- standardized pytest markers: `unit`, `integration`, `e2e`, `network`
-- centralized synthetic fixture helpers in `tests/fixtures.py`
-- dedicated e2e smoke coverage for CLI demo path
-- task runner targets via `Makefile`: `lint`, `test`, `test-e2e`, `ci`
-- CI workflow at `.github/workflows/ci.yml` aligned with local commands
-
-## Technical Decisions (Phase 0)
-
-- **Language/runtime:** Python 3.10+
-- **Dependency manager/build backend:** `pyproject.toml` with `setuptools`
-- **PDF stack (planned for Story 2+):** `pymupdf` (primary), optional OCR
-  fallback interface for scan-heavy pages
-- **Embedding strategy (planned):** pluggable adapter with local stub/default
-  and optional remote provider via env config
-- **LLM strategy (planned):** pluggable adapter with local stub/default and
-  optional remote provider via env config
-- **Dev vector DB strategy (planned):** local-first provider for fast
-  prototyping; production-target mapping will be documented in `docs/ROADMAP.md`
-
-## Project Layout
-
-```text
-src/real_estate_rag/
-  ingestion/
-  cleaning/
-  chunking/
-  embedding/
-  vector_store/
-  rag/
-  cli/
-docs/
-tests/
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           USER QUESTION                                      │
+│                    "What cap rate evidence exists?"                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          EMBEDDING CLIENT                                    │
+│                    (converts question to vector)                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          VECTOR DATABASE                                     │
+│              (finds similar chunks via cosine similarity)                    │
+│                         ChromaDB (local)                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           RAG ENGINE                                         │
+│           (assembles context + generates grounded answer)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      ANSWER + CITATIONS                                      │
+│         "Based on [CONTEXT 1], cap rate is 6.1%..."                         │
+│         Citations: doc_id, page_span, score                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Setup
+---
+
+## The Data Pipeline (How PDFs Become Searchable)
+
+```
+PDF Files                 INGESTION              CLEANING               CHUNKING
+───────────              ──────────             ─────────              ─────────
+
+┌──────────┐            ┌──────────┐           ┌──────────┐          ┌──────────┐
+│ comp.pdf │            │ Extract  │           │ Remove   │          │ Split    │
+│ memo.pdf │  ────────► │ pages +  │ ────────► │ noise +  │ ───────► │ into     │
+│ lease.pdf│            │ metadata │           │ normalize│          │ chunks   │
+└──────────┘            └──────────┘           └──────────┘          └──────────┘
+                              │                      │                     │
+                              ▼                      ▼                     ▼
+                         • doc_id             • Headers removed      • 300 char chunks
+                         • page_index         • Dates: 2025-03-07    • 40 char overlap
+                         • silo               • Currency: $1,250,000 • chunk_id
+                         • warnings           • Area: sqft           • metadata preserved
+
+
+CHUNKING                  EMBEDDING              VECTOR STORE
+─────────                ──────────             ─────────────
+
+┌──────────┐            ┌──────────┐           ┌──────────┐
+│ Text     │            │ Convert  │           │ Store    │
+│ chunks   │  ────────► │ to       │ ────────► │ vectors  │
+│ + meta   │            │ vectors  │           │ + meta   │
+└──────────┘            └──────────┘           └──────────┘
+                              │                      │
+                              ▼                      ▼
+                         [0.23, 0.87, ...]     ChromaDB
+                         (12-dim for local)    (persistent)
+```
+
+---
+
+## Tools and Technologies
+
+### Core Stack
+
+| Technology | Purpose | File |
+|------------|---------|------|
+| **Python 3.10+** | Runtime language | - |
+| **pypdf** | PDF text extraction | `ingestion/pdf_ingestion.py` |
+| **ChromaDB** | Vector database (local, persistent) | `vector_store/chroma_store.py` |
+| **ReportLab** | Generate sample PDFs for testing | `cli/main.py`, `scripts/` |
+
+### Project Structure
+
+```
+src/real_estate_rag/
+├── ingestion/          # PDF discovery and extraction
+│   └── pdf_ingestion.py
+├── cleaning/           # Data normalization and deduplication
+│   └── pipeline.py
+├── chunking/           # Split text into retrieval-sized pieces
+│   └── pipeline.py
+├── embedding/          # Convert text to vectors
+│   └── adapters.py
+├── vector_store/       # Store and query vectors
+│   ├── base.py
+│   └── chroma_store.py
+├── rag/                # Retrieval-augmented generation
+│   ├── engine.py
+│   └── llm.py
+└── cli/                # Command-line interface
+    └── main.py
+```
+
+---
+
+## How Each Component Works
+
+### 1. Ingestion (`ingestion/pdf_ingestion.py`)
+
+**Purpose:** Extract text from PDFs with metadata
+
+```python
+# What it does:
+# - Discovers all PDFs recursively in a directory
+# - Extracts text page-by-page using pypdf
+# - Generates stable doc_id via SHA-256 hash of file bytes
+# - Infers "silo" from folder structure (comps/, leases/, etc.)
+# - Flags low-text pages as potential scans
+
+# Key output:
+IngestedDocument(
+    doc_id="abc123...",      # Stable hash ID
+    file_path="/path/to/doc.pdf",
+    silo="comps",            # From folder name
+    total_pages=3,
+    pages=(PageExtraction(...), ...),
+    warnings=("contains_scan_suspected_pages",)
+)
+```
+
+### 2. Cleaning (`cleaning/pipeline.py`)
+
+**Purpose:** Remove noise and normalize formats
+
+This is the **"secret sauce"** — why off-the-shelf RAG tools fail:
+
+```python
+# What it removes:
+# - Repeated headers/footers ("CONFIDENTIAL REPORT" on every page)
+# - Page numbers ("Page 1 of 2")
+# - Near-duplicate content
+
+# What it normalizes:
+# - Dates: "3/7/2025" → "2025-03-07"
+# - Currency: "$ 1,250,000" → "$1,250,000"
+# - Area: "12500 SF", "sq ft" → "12500 sqft"
+# - Cap rates: extracts "6.1%" as metadata
+```
+
+**Before vs After:**
+```
+BEFORE (raw):                          AFTER (cleaned):
+─────────────                          ────────────────
+CONFIDENTIAL REPORT                    NOI noted on 2025-03-07 at
+NOI noted on 3/7/2025 at               $1,250,000 for 12500 sqft
+$ 1,250,000 for 12500 SF
+Page 1 of 2
+```
+
+### 3. Chunking (`chunking/pipeline.py`)
+
+**Purpose:** Split cleaned text into retrieval-sized pieces
+
+```python
+# Configuration:
+max_chunk_chars = 300    # Maximum chunk size
+overlap_chars = 40       # Overlap between chunks (context continuity)
+
+# What it produces:
+TextChunk(
+    chunk_id="def456...",    # Stable hash ID
+    text="NOI noted on...",
+    doc_id="abc123...",      # Links back to source
+    page_span=(1, 1),        # Source page(s)
+    silo="comps",
+    content_type="narrative" # or "table_like"
+)
+```
+
+### 4. Embedding (`embedding/adapters.py`)
+
+**Purpose:** Convert text to numerical vectors for similarity search
+
+**Two modes:**
+
+| Mode | Class | Use Case |
+|------|-------|----------|
+| **Local (offline)** | `LocalHashEmbeddingClient` | Testing, demos, CI |
+| **Remote (API)** | `RemoteHTTPEmbeddingClient` | Production (Vertex AI, OpenAI) |
+
+```python
+# Local mode (deterministic, no API):
+client = LocalHashEmbeddingClient(dimensions=12)
+vectors = client.embed(["What is cap rate?"])
+# Returns: [[0.23, 0.87, 0.45, ...]]  (12 floats from SHA-256 hash)
+
+# Remote mode (real semantic embeddings):
+client = RemoteHTTPEmbeddingClient(
+    endpoint="https://api.openai.com/v1/embeddings",
+    model="text-embedding-3-small",
+    api_key="sk-..."
+)
+```
+
+### 5. Vector Store (`vector_store/chroma_store.py`)
+
+**Purpose:** Store vectors and find similar ones
+
+```python
+# Store chunks:
+store = ChromaVectorStore("./vector_db", "valuation_chunks")
+store.upsert(chunks, vectors)
+
+# Query:
+results = store.query(
+    query_vector,
+    top_k=5,
+    metadata_filter={"silo": "comps"}  # Optional filtering
+)
+# Returns chunks ranked by similarity score
+```
+
+**Storage:** Local SQLite database + binary files in `./vector_db/`
+
+### 6. RAG Engine (`rag/engine.py`)
+
+**Purpose:** Orchestrate retrieval + generation
+
+```python
+# Flow:
+# 1. Embed the user's question
+# 2. Query vector store for similar chunks
+# 3. Filter by minimum score threshold
+# 4. Assemble context within budget (max_context_chars)
+# 5. Build grounded prompt for LLM
+# 6. Generate answer (or return "insufficient evidence")
+# 7. Return answer + citations
+```
+
+**Key safety features:**
+- **Grounding:** LLM is instructed to use ONLY provided context
+- **No-evidence handling:** Returns explicit `insufficient_evidence=True` instead of hallucinating
+- **Citations:** Every answer includes source references
+
+### 7. CLI (`cli/main.py`)
+
+**Purpose:** User-facing commands
+
+| Command | What It Does |
+|---------|--------------|
+| `re-rag create-sample-data` | Generate synthetic test PDFs |
+| `re-rag ingest` | Inspect ingestion output |
+| `re-rag index` | Full pipeline: ingest → clean → chunk → embed → store |
+| `re-rag ask` | Query the indexed data |
+
+---
+
+## Why This Architecture?
+
+### The Problem with Standard RAG Tools
+
+Standard tools (LangChain loaders, LlamaIndex) do:
+```
+PDF → Extract text → Chunk → Embed → Store
+```
+
+But they **don't handle**:
+- Repeated headers on every page ("CONFIDENTIAL")
+- Inconsistent date formats (`3/7/2025` vs `2025-03-07`)
+- Currency variations (`$ 1,250,000` vs `$1.25M`)
+- Near-duplicate paragraphs
+- Low-quality/scanned pages
+
+This creates **noisy retrieval** — the vector search returns irrelevant chunks.
+
+### This Solution
+
+```
+PDF → Extract → CUSTOM CLEANING → Chunk → Embed → Store
+              ─────────────────
+              (The differentiator)
+```
+
+The custom cleaning pipeline:
+1. Removes noise before it enters the index
+2. Normalizes formats for consistent matching
+3. Deduplicates repetitive content
+4. Preserves provenance for citations
+
+---
+
+## Quick Start
+
+### Setup
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[dev]"
+pip install -e ".[dev]"
 ```
 
-## Documentation
-
-- `docs/ARCHITECTURE.md`: end-to-end architecture, data flow, and decision log
-- `docs/ROADMAP.md`: prototype-to-production plan with GCP-forward options
-- `docs/COMPLIANCE.md`: confidentiality/data handling dos and don'ts
-- `docs/DEMO.md`: demo script and screen-share-safe runbook
-- `docs/FAQ.md`: short technical Q&A primer for likely reviewer questions
-- `CONTRIBUTING.md`: test/lint/CI commands and marker policy
-
-## CLI Commands
+### Demo in 3 Commands
 
 ```bash
-re-rag --help
-re-rag --version
-re-rag ingest --help
-re-rag index --help
-re-rag ask --help
+# 1. Generate sample data (50 PDFs)
+python scripts/generate_50_samples.py
+
+# 2. Index the documents
+re-rag index --input-dir ./sample_data_50 \
+  --vector-db-path ./vector_db_50 \
+  --collection valuation_50 \
+  --embedding-provider local \
+  --embedding-dimensions 12
+
+# 3. Ask questions
+re-rag ask --question "What cap rate evidence exists?" \
+  --vector-db-path ./vector_db_50 \
+  --collection valuation_50 \
+  --embedding-provider local \
+  --embedding-dimensions 12 \
+  --llm-provider stub \
+  --top-k 5
 ```
 
-## Ingestion API (Story 2)
+**All offline, no API keys needed.**
+
+### Query with Silo Filtering
+
+```bash
+# Only search lease documents
+re-rag ask --question "Show me lease terms" \
+  --silo leases \
+  --vector-db-path ./vector_db_50 \
+  --collection valuation_50 \
+  --embedding-provider local \
+  --embedding-dimensions 12 \
+  --llm-provider stub \
+  --top-k 5
+```
+
+---
+
+## Interview Context
+
+This prototype demonstrates:
+
+| Assessment Criteria | How It's Demonstrated |
+|--------------------|----------------------|
+| **Domain-specific technical acumen** | Real estate cleaning logic (cap rates, NOI, dates) |
+| **Hands-on keyboard skills** | Live CLI demo |
+| **Identifying customer solutions** | Custom pipeline solves "data trapped in silos" |
+| **Conveying business value** | Auditable citations, reduced manual processing |
+| **Handling questions** | Architecture docs, trade-off decisions |
+
+---
+
+## Implemented Scope
+
+### Story 1-8 (Complete)
+
+- **Story 1:** Installable package layout, placeholder CLI, environment hygiene
+- **Story 2:** PDF ingestion with page-level extraction metadata
+- **Story 3:** Custom cleaning and normalization pipeline
+- **Story 4:** Page-aware chunking and embedding adapters
+- **Story 5:** Persistent vector indexing and metadata-filtered retrieval
+- **Story 6:** RAG orchestration with grounding, citations, and safe no-evidence behavior
+- **Story 7:** Demo-ready CLI surface and runbook
+- **Story 8:** Test hardening, automation commands, and CI smoke checks
+
+---
+
+## API Reference
+
+### Ingestion API
 
 ```python
 from pathlib import Path
@@ -137,22 +401,9 @@ from real_estate_rag.ingestion import ingest_pdf_directory
 docs = ingest_pdf_directory(Path("./sample_data"), low_text_threshold=25)
 for doc in docs:
     print(doc.doc_id, doc.silo, doc.total_pages, doc.warnings)
-    for page in doc.pages:
-        print(page.page_index, page.char_count, page.scan_suspected)
 ```
 
-### Ingestion Output Contract
-
-- `IngestedDocument.doc_id`: stable SHA-256 hash of file bytes
-- `IngestedDocument.file_path`: absolute file path
-- `IngestedDocument.relative_path`: path relative to input root
-- `IngestedDocument.silo`: top-level subfolder under input root (`default` if none)
-- `IngestedDocument.total_pages`: extracted page count
-- `PageExtraction.page_index`: 1-based page index
-- `PageExtraction.text`: raw extracted page text (no cleaning in Story 2)
-- `PageExtraction.scan_suspected`: `True` for low-text pages (routing signal for OCR in later stories)
-
-## Cleaning API (Story 3)
+### Cleaning API
 
 ```python
 from real_estate_rag.cleaning import CleaningConfig, clean_documents
@@ -164,17 +415,7 @@ for segment in segments:
     print(segment.doc_id, segment.page_span, segment.silo, segment.content_type)
 ```
 
-### CleanSegment Output Contract
-
-- `text`: cleaned and normalized segment text
-- `doc_id`: source document id from ingestion
-- `page_span`: inclusive source page range (Story 3 uses single-page spans)
-- `silo`: source silo label from ingestion
-- `content_type`: heuristic label (`narrative` or `table_like`)
-- `normalized_fields`: extracted normalized hints (e.g., `date_example`, `currency_example`, `cap_rate`)
-- `warnings`: combined stage + source warnings
-
-## Chunking API (Story 4)
+### Chunking API
 
 ```python
 from real_estate_rag.chunking import ChunkingConfig, chunk_segments
@@ -185,73 +426,7 @@ chunks = chunk_segments(
 )
 ```
 
-### TextChunk Output Contract
-
-- `chunk_id`: deterministic SHA-256 id
-- `text`: retrieval-sized chunk text
-- `doc_id`, `page_span`, `silo`: source traceability fields
-- `content_type`, `normalized_fields`: inherited content hints
-- `source_warnings`: inherited warnings from cleaned source
-- `chunk_index`, `total_chunks_for_segment`: position metadata
-
-### Chunking defaults
-
-- `max_chunk_chars=300`
-- `overlap_chars=40`
-- Character-based splitting for deterministic, model-agnostic behavior
-
-## Embedding Adapter API (Story 4)
-
-```python
-from real_estate_rag.embedding import create_embedding_client_from_env
-
-client = create_embedding_client_from_env(provider="local", dimensions=12)
-vectors = client.embed([chunk.text for chunk in chunks])
-```
-
-### Embedding provider switch
-
-- Local deterministic path (no secrets, default for tests):
-  - `EMBEDDING_PROVIDER=local`
-  - `EMBEDDING_DIMENSIONS=12`
-- Optional remote HTTP path (when integrated with a provider endpoint):
-  - `EMBEDDING_PROVIDER=remote_http`
-  - `EMBEDDING_API_BASE_URL=<provider-endpoint>`
-  - `EMBEDDING_MODEL=<model-name>`
-  - `EMBEDDING_API_KEY=<secret>`
-
-Remote configuration values must stay in local `.env` and never be committed.
-
-## Vector Store API (Story 5)
-
-```python
-from real_estate_rag.vector_store import ChromaVectorStore
-
-store = ChromaVectorStore("./vector_db", "valuation_chunks")
-store.upsert(chunks, vectors)
-hits = store.query(query_vector, top_k=3, metadata_filter={"silo": "comps"})
-```
-
-### Persistence behavior
-
-`ChromaVectorStore` uses a persistent on-disk path (`VECTOR_DB_PATH`) so indexed
-vectors remain available across process restarts when the same path and
-collection name are reused.
-
-### Minimal CLI hook (Story 5)
-
-```bash
-re-rag index-local --input-dir ./sample_data --vector-db-path ./vector_db --collection valuation_chunks
-re-rag query-local --question "cap rate for downtown office" --vector-db-path ./vector_db --collection valuation_chunks --top-k 3
-```
-
-Optional metadata filter:
-
-```bash
-re-rag query-local --question "lease activity" --silo offering_memo --top-k 3
-```
-
-## RAG API (Story 6)
+### RAG API
 
 ```python
 from real_estate_rag.embedding import LocalHashEmbeddingClient
@@ -267,84 +442,84 @@ engine = RagEngine(
 response = engine.answer("What cap rate evidence exists?", metadata_filter={"silo": "comps"})
 ```
 
-### Citation format
+---
 
-Each `Citation` returned in `RagResponse.citations` includes:
-- `chunk_id`
-- `doc_id`
-- `page_span` `(start_page, end_page)`
-- `score`
-
-This keeps answers auditable for technical stakeholders and allows business
-stakeholders to trust that statements are grounded in indexed evidence.
-
-### Trust boundaries and safety behavior
-
-- RAG prompts instruct the model to use only provided snippets.
-- If retrieval returns no usable evidence (or everything is below `RAG_MIN_SCORE`),
-  `RagEngine` returns an explicit safe response with
-  `insufficient_evidence=True` and no citations.
-- Story 6 does not claim valuation certainty without supporting context.
-
-## Demo in 3 Commands (Story 7)
+## Running Tests
 
 ```bash
-re-rag create-sample-data --output-dir ./sample_data
-re-rag index --input-dir ./sample_data --vector-db-path ./vector_db --collection valuation_chunks --embedding-provider local --embedding-dimensions 12
-re-rag ask --question "What cap rate evidence exists?" --vector-db-path ./vector_db --collection valuation_chunks --embedding-provider local --embedding-dimensions 12 --llm-provider stub --top-k 3
-```
-
-See `docs/DEMO.md` for timing script, expected output format, fallback mode, and
-screen-share hygiene.
-
-### Why not off-the-shelf load-and-chunk only?
-
-This corpus includes repeated report banners, page markers, short noisy pages,
-and formatting inconsistency (`$ 1,250,000`, `3/7/2025`, `12500 SF`). A
-chunk-only approach would index these artifacts as-is, increasing retrieval
-noise. Story 3 removes repetitive boilerplate, normalizes conservative patterns,
-and suppresses near duplicates before chunking so downstream retrieval quality
-is more stable.
-
-### Before vs After (synthetic example)
-
-**Before (raw page text):**
-```text
-CONFIDENTIAL REPORT
-NOI noted on 3/7/2025 at $ 1,250,000 for 12500 SF
-Page 1 of 2
-```
-
-**After (clean segment text):**
-```text
-NOI noted on 2025-03-07 at $1,250,000 for 12500 sqft
-```
-
-## Basic Checks
-
-```bash
+# Lint
 make lint
+
+# Unit tests (fast, offline)
 make test
+
+# End-to-end tests
 make test-e2e
+
+# All checks (lint + test + e2e)
 make ci
 ```
 
-## Test and CI Notes
+---
 
-- Default suite (`make test`) is offline and excludes `e2e` and `network` markers.
-- E2E smoke (`make test-e2e`) validates `create-sample-data -> index -> ask` path.
-- Network-marked tests are opt-in and skipped by default in CI.
-- CI workflow runs lint + default suite + e2e smoke on push/PR.
+## Documentation
 
-## Design and Architecture Docs
+- `docs/ARCHITECTURE.md` - End-to-end architecture, data flow, and decision log
+- `docs/ROADMAP.md` - Prototype-to-production plan with GCP-forward options
+- `docs/COMPLIANCE.md` - Confidentiality/data handling dos and don'ts
+- `docs/DEMO.md` - Demo script and screen-share-safe runbook
+- `docs/FAQ.md` - Short technical Q&A primer for likely reviewer questions
+- `CONTRIBUTING.md` - Test/lint/CI commands and marker policy
+- `DESIGN.md` - Design decisions and architecture baseline
 
-- `DESIGN.md` - design decisions and architecture baseline updated through Story 8
-- `docs/ARCHITECTURE.md` - architecture contracts through Story 9 doc pass
-- `docs/ROADMAP.md` - production-oriented roadmap and business outcomes
-- `docs/COMPLIANCE.md` - confidentiality and data handling policy
-- `docs/DEMO.md` - demo script and runbook
-- `CONTRIBUTING.md` - contributor commands, marker policy, and failure guidance
+---
 
-## Next Stories
+## Embedding Provider Configuration
 
-- Story 10+: presentation package and rehearsal/readiness workflows
+### Local (Offline - Default)
+
+```bash
+--embedding-provider local --embedding-dimensions 12
+```
+
+No API keys needed. Uses deterministic hash-based vectors.
+
+### Remote (Production)
+
+```bash
+export EMBEDDING_PROVIDER=remote_http
+export EMBEDDING_API_BASE_URL=https://api.openai.com/v1/embeddings
+export EMBEDDING_MODEL=text-embedding-3-small
+export EMBEDDING_API_KEY=sk-...
+
+re-rag index --embedding-provider remote_http ...
+```
+
+---
+
+## LLM Provider Configuration
+
+### Stub (Offline - Default)
+
+```bash
+--llm-provider stub
+```
+
+Returns static response. No API keys needed.
+
+### Remote (Production)
+
+```bash
+export LLM_PROVIDER=remote_http
+export LLM_API_BASE_URL=https://api.openai.com/v1/chat/completions
+export LLM_MODEL=gpt-4
+export LLM_API_KEY=sk-...
+
+re-rag ask --llm-provider remote_http ...
+```
+
+---
+
+## License
+
+This is an educational prototype for interview demonstration purposes.
